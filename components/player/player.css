@@ -1,0 +1,153 @@
+.player-stage {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  background: #000;
+  overflow: hidden;
+}
+
+.player-stage video {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  display: block;
+}
+
+.player-stage .centerPlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: none;
+}
+.player-stage .centerPlay svg {
+  width: 64px;
+  height: 64px;
+  opacity: 0;
+  transform: scale(0.85);
+  filter: drop-shadow(0 6px 24px rgba(0,0,0,0.6));
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.player-stage .centerPlay.show svg { opacity: 0.92; transform: scale(1); }
+
+.player-stage .spinner {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 44px; height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  display: none;
+  animation: nexSpin 800ms linear infinite;
+}
+.player-stage .spinner.show { display: block; }
+@keyframes nexSpin { to { transform: rotate(360deg); } }
+
+.player-stage .status {
+  position: fixed;
+  top: 14px; left: 14px;
+  max-width: calc(100% - 28px);
+  color: #eef0fb;
+  font-size: 12.5px;
+  background: rgba(20, 20, 30, 0.72);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 8px 14px;
+  border-radius: 10px;
+  z-index: 40;
+}
+
+.player-stage .controls {
+  position: absolute;
+  left: 8px; right: 8px; bottom: 8px;
+  z-index: 30;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  padding: 12px 14px 8px;
+  box-shadow: 0 12px 36px -8px rgba(0,0,0,0.6);
+  color: #fff;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  transition: transform 250ms ease, opacity 250ms ease;
+}
+.player-stage .controls.hidden { transform: translateY(14px); opacity: 0; pointer-events: none; }
+.player-stage.idle { cursor: none; }
+
+.player-stage .seek {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: height 150ms ease;
+}
+.player-stage .seek:hover, .player-stage .seek.dragging { height: 9px; }
+.player-stage .seekTrack { position: absolute; inset: 0; border-radius: 999px; background: rgba(255,255,255,0.2); }
+.player-stage .seekBuffered { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: rgba(255,255,255,0.35); width: 0%; }
+.player-stage .seekPlayed {
+  position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #5b5fef, #8a6fef);
+  box-shadow: 0 0 10px -1px rgba(91,95,239,0.7);
+  width: 0%;
+}
+.player-stage .seekHandle {
+  position: absolute; top: 50%; left: 0%;
+  width: 12px; height: 12px; margin-left: -6px;
+  border-radius: 50%; background: #fff;
+  border: 2px solid #5b5fef;
+  transform: translateY(-50%) scale(0.7);
+  opacity: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.player-stage .seek:hover .seekHandle, .player-stage .seek.dragging .seekHandle { opacity: 1; transform: translateY(-50%) scale(1); }
+
+.player-stage .controlsRow { display: flex; align-items: center; gap: 2px; }
+.player-stage .ctrlBtn {
+  display: flex; align-items: center; justify-content: center;
+  padding: 7px; border-radius: 9px;
+  background: transparent; border: none;
+  color: rgba(255,255,255,0.9); cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+.player-stage .ctrlBtn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+.player-stage .volGroup { display: flex; align-items: center; }
+.player-stage .volSlider { width: 0; overflow: hidden; transition: width 200ms ease; }
+.player-stage .volGroup:hover .volSlider { width: 72px; }
+.player-stage .volSlider input[type="range"] { width: 64px; margin: 0 4px 0 2px; accent-color: #5b5fef; cursor: pointer; }
+
+.player-stage .timeDisplay { margin-left: 6px; font-size: 12.5px; font-weight: 600; white-space: nowrap; color: rgba(255,255,255,0.95); font-variant-numeric: tabular-nums; }
+.player-stage .timeDisplay .sep { font-weight: 400; color: rgba(255,255,255,0.5); }
+
+.player-stage .spacer { flex: 1; }
+
+.player-stage .settingsWrap { position: relative; }
+.player-stage .settingsMenu {
+  position: absolute; bottom: 42px; right: 0;
+  background: rgba(18, 18, 26, 0.92);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 8px;
+  min-width: 160px;
+  display: none;
+  box-shadow: 0 14px 34px rgba(0,0,0,0.55);
+}
+.player-stage .settingsMenu.open { display: block; }
+.player-stage .settingsSection { display: flex; flex-direction: column; gap: 1px; }
+.player-stage .settingsLabel { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); margin: 6px 6px 3px; }
+.player-stage .settingsOpt {
+  display: flex; justify-content: space-between; align-items: center;
+  background: transparent; border: none; color: rgba(255,255,255,0.85);
+  padding: 6px 8px; border-radius: 8px; font-size: 12.5px; cursor: pointer; text-align: left;
+  width: 100%;
+}
+.player-stage .settingsOpt:hover { background: rgba(255,255,255,0.09); }
+.player-stage .settingsOpt.active { color: #5b5fef; font-weight: 700; }
+.player-stage .settingsOpt.active::after { content: "✓"; font-size: 11px; }
