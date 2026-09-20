@@ -45,12 +45,25 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     return <ErrorState message="This media link has expired." />;
   }
 
+  const mediaBase = process.env.NEXT_PUBLIC_MEDIA_PROXY_URL;
+  if (!mediaBase) {
+    // Fails loudly rather than silently pointing at a broken URL — this
+    // means NEXT_PUBLIC_MEDIA_PROXY_URL wasn't set in the deployment.
+    return <ErrorState message="Media proxy is not configured. Set NEXT_PUBLIC_MEDIA_PROXY_URL." />;
+  }
+
   if (link.media_type === "hls") {
-    return <Player kind="hls" manifestUrl={`/api/media/${id}/manifest`} />;
+    return <Player kind="hls" manifestUrl={`${mediaBase}/media/${id}/manifest`} />;
   }
 
   // "direct" kind covers both video files (mp4/webm) and images — decide
   // at render time based on the actual response Content-Type rather than
   // guessing from the (never-exposed) original URL's extension.
-  return <Player kind="direct" mediaUrl={`/api/media/${id}`} fallback={<ImageViewer src={`/api/media/${id}`} />} />;
+  return (
+    <Player
+      kind="direct"
+      mediaUrl={`${mediaBase}/media/${id}`}
+      fallback={<ImageViewer src={`${mediaBase}/media/${id}`} />}
+    />
+  );
 }

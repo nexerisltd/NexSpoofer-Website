@@ -1,0 +1,24 @@
+# Cloudflare Worker config for the NexSpoofer media proxy.
+#
+# Deploy with: npx wrangler deploy   (from inside this worker/ folder)
+# Then set the secrets (never put these in this file, they're not
+# committed as plaintext — see README.md in this folder):
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put ENCRYPTION_KEY
+
+name = "nexspoofer-media"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Optional static baseline — same idea as the Next.js app's env var of the
+# same name. Primary control is still the /sa "Approved Media Domains"
+# panel, which both this Worker and the Next.js app read from the same
+# Supabase table.
+ALLOWED_MEDIA_HOSTS = ""
+
+# The Next.js app's deployed origin (e.g. https://nexspoofer.vercel.app) —
+# used to set Access-Control-Allow-Origin so the browser (running on that
+# origin) is allowed to fetch this Worker's cross-origin responses.
+ALLOWED_ORIGIN = "http://localhost:3000"

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import { requireRole } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
@@ -53,7 +54,10 @@ export default async function SuperAdminPage() {
   return (
     <main className="page-shell" style={{ maxWidth: 980 }}>
       <div className="page-header">
-        <div className="brand-mark">NexSpoofer — Super Admin</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Image src="/logo.png" alt="" width={28} height={28} />
+          <div className="brand-mark">NexSpoofer — Super Admin</div>
+        </div>
       </div>
 
       <section className="glass-card" style={{ marginBottom: 24 }}>

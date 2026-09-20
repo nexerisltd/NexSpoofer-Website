@@ -127,6 +127,24 @@ export function isHostnameAllowed(hostname: string, allowlist: string[]): boolea
   return allowlist.some((allowed) => host === allowed || host.endsWith("." + allowed));
 }
 
+/**
+ * The single check every route should call: is this hostname approved to
+ * fetch from? Primary control is the Super Admin's "Approved Media
+ * Domains" panel at /sa (the allowed_media_domains table); ALLOWED_MEDIA_HOSTS
+ * is now just an optional extra baseline (e.g. for a first domain before
+ * you've logged in as Super Admin yet), not a required env var.
+ *
+ * Deny-by-default: if NOTHING is approved yet (env empty AND table empty),
+ * this returns false for everything — so a fresh deploy with no domains
+ * added in /sa cannot be used to fetch anything, rather than silently
+ * allowing every host until someone remembers to lock it down.
+ */
+export async function isMediaHostApproved(hostname: string): Promise<boolean> {
+  const hosts = await getAllowedHosts();
+  if (!hosts.length) return false;
+  return isHostnameAllowed(hostname, hosts);
+}
+
 function baseDomain(hostname: string): string {
   const parts = hostname.toLowerCase().split(".");
   return parts.slice(-2).join(".");

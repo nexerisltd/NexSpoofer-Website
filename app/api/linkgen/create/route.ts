@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { generatePublicId } from "@/lib/ids";
-import { assertSafeToFetch, isHostnameAllowed, getAllowedHosts } from "@/lib/security";
+import { assertSafeToFetch, isMediaHostApproved } from "@/lib/security";
 import { requireRole } from "@/lib/auth";
 
 function detectKind(url: string): "hls" | "direct" {
@@ -35,10 +35,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const allowlist = await getAllowedHosts();
-  if (allowlist.length && !isHostnameAllowed(target.hostname, allowlist)) {
+  if (!(await isMediaHostApproved(target.hostname))) {
     return NextResponse.json(
-      { success: false, error: { code: "DOMAIN_NOT_ALLOWED", message: "This media host is not on the approved list." } },
+      { success: false, error: { code: "DOMAIN_NOT_ALLOWED", message: "This media host is not on the approved list. Add it from /sa first." } },
       { status: 403 }
     );
   }

@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Image from "next/image";
 import "./player.css";
 
 type Props =
   | { kind: "hls"; manifestUrl: string; mediaUrl?: undefined; fallback?: undefined }
   | { kind: "direct"; mediaUrl: string; manifestUrl?: undefined; fallback?: ReactNode };
+
+type StatusState = { kind: "loading" | "error"; message: string } | null;
 
 const ICONS = {
   play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5v13l11-6.5-11-6.5Z"/></svg>',
@@ -59,9 +62,10 @@ export default function Player(props: Props) {
   const qualityOptionsRef = useRef<HTMLDivElement>(null);
   const fsBtnRef = useRef<HTMLButtonElement>(null);
 
-  const [status, setStatus] = useState<string | null>("Preparing stream…");
+  const [status, setStatus] = useState<StatusState>({ kind: "loading", message: "Preparing stream…" });
   const [isImage, setIsImage] = useState(false);
   const [checkingType, setCheckingType] = useState(props.kind === "direct");
+  const retryRef = useRef<() => void>(() => {});
 
   // For "direct" links we don't know client-side whether it's a video or
   // image (the real extension/type was never exposed to the browser) —
@@ -385,12 +389,30 @@ export default function Player(props: Props) {
     let hlsInstance: any = null;
     let cancelled = false;
 
+    const onVideoError = () => {
+      console.error("[NexSpoofer player] video element error:", video.error);
+      spinner.classList.remove("show");
+      setStatus({ kind: "error", message: "Unable to load this media." });
+    };
+    video.addEventListener("error", onVideoError);
+
     async function start() {
+      spinner.classList.add("show");
       if (props.kind === "hls") {
         const HlsMod = (await import("hls.js")).default;
         if (cancelled) return;
         if (HlsMod.isSupported()) {
-          const hls = new HlsMod({ maxBufferLength: 30 });
+          const hls = new HlsMod({
+            // Buffer generously ahead so playback rides out normal network
+            // jitter instead of stalling — traffic already goes through
+            // our own proxy on top of the origin, so a deeper buffer
+            // matters more here than for a direct CDN connection.
+            maxBufferLength: 60,
+            maxMaxBufferLength: 120,
+            maxBufferSize: 120 * 1000 * 1000,
+            backBufferLength: 90,
+            enableWorker: true,
+          });
           hlsInstance = hls;
           let networkRetries = 0;
           const MAX_RETRIES = 5;
@@ -400,22 +422,26 @@ export default function Player(props: Props) {
             switch (data.type) {
               case HlsMod.ErrorTypes.NETWORK_ERROR:
                 if (networkRetries++ < MAX_RETRIES) {
-                  setStatus(`Network hiccup — retrying (${networkRetries}/${MAX_RETRIES})…`);
+                  spinner.classList.add("show");
+                  setStatus({ kind: "loading", message: `Network hiccup — retrying (${networkRetries}/${MAX_RETRIES})…` });
                   setTimeout(() => hls.startLoad(), 800);
                 } else {
-                  setStatus("Unable to load this media.");
+                  spinner.classList.remove("show");
+                  setStatus({ kind: "error", message: "Unable to load this media." });
                 }
                 break;
               case HlsMod.ErrorTypes.MEDIA_ERROR:
-                setStatus("Recovering from a media error…");
+                setStatus({ kind: "loading", message: "Recovering from a media error…" });
                 hls.recoverMediaError();
                 break;
               default:
-                setStatus("Unable to load this media.");
+                spinner.classList.remove("show");
+                setStatus({ kind: "error", message: "Unable to load this media." });
                 hls.destroy();
             }
           });
           hls.on(HlsMod.Events.MANIFEST_PARSED, () => {
+            spinner.classList.remove("show");
             setStatus(null);
             buildQualityOptions(hls);
             video.play().catch(() => {});
@@ -424,20 +450,40 @@ export default function Player(props: Props) {
           hls.attachMedia(video);
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           video.src = props.manifestUrl;
+          video.load();
+          spinner.classList.remove("show");
           setStatus(null);
         } else {
-          setStatus("This browser cannot play HLS streams.");
+          spinner.classList.remove("show");
+          setStatus({ kind: "error", message: "This browser cannot play HLS streams." });
         }
       } else {
         video.src = props.mediaUrl;
+        video.load();
         setStatus(null);
       }
     }
+
+    retryRef.current = () => {
+      if (hlsInstance) {
+        try {
+          hlsInstance.destroy();
+        } catch {
+          /* already dead */
+        }
+        hlsInstance = null;
+      }
+      cancelled = false;
+      setStatus({ kind: "loading", message: "Preparing stream…" });
+      start();
+    };
+
     start();
 
     return () => {
       cancelled = true;
       if (hlsInstance) hlsInstance.destroy();
+      video.removeEventListener("error", onVideoError);
       seek.removeEventListener("mousedown", onSeekDown as EventListener);
       window.removeEventListener("mousemove", onSeekMove as EventListener);
       window.removeEventListener("mouseup", onSeekUp);
@@ -465,8 +511,33 @@ export default function Player(props: Props) {
     <div id="stage" className="player-stage" ref={stageRef}>
       <video id="video" ref={videoRef} playsInline />
       <div className="centerPlay" ref={centerPlayRef} />
-      <div className="spinner" ref={spinnerRef} />
-      {status && <div className="status">{status}</div>}
+
+      <div className="spinner" ref={spinnerRef}>
+        <div className="spinnerLogo">
+          <Image src="/logo.png" alt="" width={40} height={40} priority />
+        </div>
+        <div className="signalBars" aria-hidden="true">
+          <span className="bar" />
+          <span className="bar" />
+          <span className="bar" />
+          <span className="bar" />
+          <span className="bar" />
+        </div>
+        <div className="spinnerCaption">
+          {status?.kind === "loading" ? status.message : "Buffering…"}
+        </div>
+      </div>
+
+      {status?.kind === "error" && (
+        <div className="errorOverlay">
+          <div className="glass-card errorCard">
+            <p style={{ margin: "0 0 14px" }}>{status.message}</p>
+            <button className="btn-primary" onClick={() => retryRef.current()}>
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="controls" ref={controlsRef}>
         <div

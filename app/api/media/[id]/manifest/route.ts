@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { assertSafeToFetch, isHostnameAllowed, getAllowedHosts } from "@/lib/security";
+import { assertSafeToFetch, isMediaHostApproved } from "@/lib/security";
 import { rewriteManifest } from "@/lib/hls";
 
 function errorResponse(code: string, message: string, status: number) {
@@ -29,8 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return errorResponse("BLOCKED_ORIGIN", "Unable to load this media.", 502);
   }
 
-  const allowlist = await getAllowedHosts();
-  if (allowlist.length && !isHostnameAllowed(originUrl.hostname, allowlist)) {
+  if (!(await isMediaHostApproved(originUrl.hostname))) {
     return errorResponse("DOMAIN_NOT_ALLOWED", "Unable to load this media.", 502);
   }
 

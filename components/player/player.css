@@ -34,30 +34,78 @@
 
 .player-stage .spinner {
   position: absolute;
-  top: 50%; left: 50%;
-  width: 44px; height: 44px;
-  margin: -22px 0 0 -22px;
-  border-radius: 50%;
-  border: 3px solid rgba(255,255,255,0.25);
-  border-top-color: #fff;
+  inset: 0;
   display: none;
-  animation: nexSpin 800ms linear infinite;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  z-index: 25;
+  pointer-events: none;
+  background: radial-gradient(60% 60% at 50% 50%, rgba(0,0,0,0.35), rgba(0,0,0,0.15) 70%, transparent 100%);
 }
-.player-stage .spinner.show { display: block; }
-@keyframes nexSpin { to { transform: rotate(360deg); } }
+.player-stage .spinner.show { display: flex; }
 
-.player-stage .status {
-  position: fixed;
-  top: 14px; left: 14px;
-  max-width: calc(100% - 28px);
-  color: #eef0fb;
+.player-stage .spinnerLogo {
+  border-radius: 16px;
+  overflow: hidden;
+  filter: drop-shadow(0 6px 24px rgba(91,95,239,0.5));
+  animation: nexBreathe 1.6s ease-in-out infinite;
+}
+@keyframes nexBreathe {
+  0%, 100% { transform: scale(0.94); opacity: 0.85; }
+  50% { transform: scale(1.04); opacity: 1; }
+}
+
+/* "Signal bars" loading indicator — kept deliberately tall/bright at every
+ * point in the animation (never dips to a short/dim bar) so it reads as a
+ * strong, healthy connection rather than a struggling one. */
+.player-stage .signalBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 28px;
+}
+.player-stage .signalBars .bar {
+  width: 5px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #8a6fef, #5b5fef);
+  box-shadow: 0 0 10px -1px rgba(91,95,239,0.85);
+  height: 100%;
+  transform-origin: bottom;
+  animation: nexSignal 900ms ease-in-out infinite;
+}
+.player-stage .signalBars .bar:nth-child(1) { animation-delay: 0ms; }
+.player-stage .signalBars .bar:nth-child(2) { animation-delay: 90ms; }
+.player-stage .signalBars .bar:nth-child(3) { animation-delay: 180ms; }
+.player-stage .signalBars .bar:nth-child(4) { animation-delay: 90ms; }
+.player-stage .signalBars .bar:nth-child(5) { animation-delay: 0ms; }
+@keyframes nexSignal {
+  0%, 100% { transform: scaleY(0.72); }
+  50% { transform: scaleY(1); }
+}
+
+.player-stage .spinnerCaption {
+  color: rgba(255,255,255,0.85);
   font-size: 12.5px;
-  background: rgba(20, 20, 30, 0.72);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.12);
-  padding: 8px 14px;
-  border-radius: 10px;
-  z-index: 40;
+  font-weight: 500;
+  text-align: center;
+  max-width: 80%;
+}
+
+.player-stage .errorOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 5, 10, 0.55);
+}
+.player-stage .errorCard {
+  max-width: 340px;
+  text-align: center;
+  color: #eef0fb;
 }
 
 .player-stage .controls {

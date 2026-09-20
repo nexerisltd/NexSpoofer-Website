@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { getSessionProfile } from "@/lib/auth";
 import LinkGenForm from "@/components/linkgen/LinkGenForm";
 
@@ -18,7 +19,10 @@ export default async function LinkGenPage() {
   return (
     <main className="page-shell">
       <div className="page-header">
-        <div className="brand-mark">NexSpoofer</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Image src="/logo.png" alt="" width={28} height={28} />
+          <div className="brand-mark">NexSpoofer</div>
+        </div>
       </div>
       <LinkGenForm />
     </main>

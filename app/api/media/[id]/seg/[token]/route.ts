@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { assertSafeToFetch, isHostnameAllowed, isSameOrigin, getAllowedHosts } from "@/lib/security";
+import { assertSafeToFetch, isMediaHostApproved, isSameOrigin } from "@/lib/security";
 import { decryptUrl } from "@/lib/crypto";
 import { rewriteManifest } from "@/lib/hls";
 
@@ -41,10 +41,14 @@ export async function GET(
     /* fall back to target's own hostname */
   }
 
-  const allowlist = await getAllowedHosts();
-  const allowedByList = allowlist.length ? isHostnameAllowed(target.hostname, allowlist) : true;
-  const allowedBySameSite = isSameOrigin(target.hostname, originHostname);
-  if (!allowedByList && !allowedBySameSite) {
+  // The manifest route already required the origin hostname to be
+  // approved before this segment could ever have been generated, so a
+  // same-site sub-resource (common CDN pattern — segments on a slightly
+  // different subdomain than the manifest) is trusted too, not just an
+  // exact allowlist match.
+  const approved = await isMediaHostApproved(target.hostname);
+  const sameSite = isSameOrigin(target.hostname, originHostname);
+  if (!approved && !sameSite) {
     return errorResponse("DOMAIN_NOT_ALLOWED", "Unable to load this media.", 502);
   }
 
