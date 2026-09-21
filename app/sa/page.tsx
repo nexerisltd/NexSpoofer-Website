@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import { requireRole } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import RoleSelect from "@/components/sa/RoleSelect";
 import {
   updateUserRole,
   setUserStatus,
@@ -26,12 +27,6 @@ export default async function SuperAdminPage() {
     supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(30),
   ]);
 
-  async function changeRole(formData: FormData) {
-    "use server";
-    const userId = String(formData.get("userId"));
-    const role = String(formData.get("role")) as "user" | "admin" | "super_admin";
-    await updateUserRole(userId, role);
-  }
   async function toggleStatus(formData: FormData) {
     "use server";
     const userId = String(formData.get("userId"));
@@ -76,15 +71,7 @@ export default async function SuperAdminPage() {
               <tr key={p.id} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <td style={{ padding: "6px 8px" }}>{p.email}</td>
                 <td style={{ padding: "6px 8px" }}>
-                  <form action={changeRole} style={{ display: "inline" }}>
-                    <input type="hidden" name="userId" value={p.id} />
-                    <select name="role" defaultValue={p.role} className="field-input" style={{ padding: "4px 6px", fontSize: 12 }}
-                      onChange={(e) => e.currentTarget.form?.requestSubmit()}>
-                      <option value="user">user</option>
-                      <option value="admin">admin</option>
-                      <option value="super_admin">super_admin</option>
-                    </select>
-                  </form>
+                  <RoleSelect userId={p.id} currentRole={p.role} onChangeRole={updateUserRole} />
                 </td>
                 <td style={{ padding: "6px 8px" }}>{p.status}</td>
                 <td style={{ padding: "6px 8px" }}>
