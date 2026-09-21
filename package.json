@@ -12,6 +12,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "hls.js": "^1.7.3",
+    "lucide-react": "^1.47.0",
     "m3u8-parser": "^7.2.0",
     "next": "16.3.5",
     "react": "19.2.8",

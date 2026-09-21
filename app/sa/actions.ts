@@ -1,13 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createServerClient } from "@/lib/supabase/server";
 
 async function assertSuperAdmin() {
   const auth = await requireRole(["super_admin"]);
   if (!auth.ok) throw new Error(auth.message);
   return auth;
+}
+
+export async function signOutAction() {
+  const supabase = await createServerClient();
+  await supabase.auth.signOut();
+  redirect("/login");
 }
 
 async function logAction(actorId: string, action: string, targetType: string, targetId: string, metadata?: object) {

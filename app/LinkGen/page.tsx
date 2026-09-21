@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import { getSessionProfile } from "@/lib/auth";
 import LinkGenForm from "@/components/linkgen/LinkGenForm";
+import LiveStatusWidget from "@/components/ui/LiveStatusWidget";
 
 export default async function LinkGenPage() {
   const { user, profile } = await getSessionProfile();
@@ -17,14 +18,26 @@ export default async function LinkGenPage() {
   }
 
   return (
-    <main className="page-shell">
-      <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <Image src="/logo.png" alt="" width={28} height={28} />
-          <div className="brand-mark">NexSpoofer</div>
+    <main style={{ minHeight: "100dvh", padding: "28px 32px" }}>
+      <div className="page-header" style={{ maxWidth: 1080, margin: "0 auto 48px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Image src="/logo.png" alt="" width={40} height={40} />
+          <div>
+            <div className="brand-mark" style={{ marginBottom: 0 }}>
+              <span className="nex">Nex</span>
+              <span className="rest">Spoofer</span>
+            </div>
+            <div className="muted" style={{ margin: 0, fontSize: 11.5 }}>
+              Link Generator · Share · Spoof
+            </div>
+          </div>
         </div>
+        <LiveStatusWidget />
       </div>
-      <LinkGenForm />
+
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <LinkGenForm />
+      </div>
     </main>
   );
 }

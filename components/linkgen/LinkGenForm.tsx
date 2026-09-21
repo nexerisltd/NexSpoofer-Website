@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Link2, Shield, ArrowRight, Copy, Check } from "lucide-react";
 
 export default function LinkGenForm() {
   const [mediaUrl, setMediaUrl] = useState("");
@@ -44,44 +45,71 @@ export default function LinkGenForm() {
   }
 
   return (
-    <div className="glass-card" style={{ maxWidth: 520 }}>
-      <h1 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>Generate Media Link</h1>
-      <p className="muted">Paste an authorized media URL to create a shareable NexSpoofer link.</p>
+    <div className="glass-card" style={{ maxWidth: 560, width: "100%" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 24 }}>
+        <div className="icon-badge">
+          <Link2 size={20} />
+        </div>
+        <div>
+          <h1 style={{ fontSize: 18, fontWeight: 700, margin: "2px 0 4px" }}>Generate Media Link</h1>
+          <p className="muted" style={{ margin: 0 }}>
+            Paste an authorized media URL to create a shareable NexSpoofer link.
+          </p>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 16 }}>
-          <label className="field-label" htmlFor="mediaUrl">Media URL</label>
-          <input
-            id="mediaUrl"
-            className="field-input"
-            placeholder="Paste your authorized media URL…"
-            value={mediaUrl}
-            onChange={(e) => setMediaUrl(e.target.value)}
-            required
-          />
+        <div style={{ marginBottom: 18 }}>
+          <label className="field-label" htmlFor="mediaUrl">
+            <Link2 size={13} /> Media URL
+          </label>
+          <div className="field-input-wrap">
+            <span className="field-icon">
+              <Link2 size={15} />
+            </span>
+            <input
+              id="mediaUrl"
+              className="field-input"
+              placeholder="Paste your authorized media URL…"
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+              required
+            />
+          </div>
         </div>
-        <div style={{ marginBottom: 20 }}>
-          <label className="field-label" htmlFor="refererUrl">Referer URL (optional)</label>
-          <input
-            id="refererUrl"
-            className="field-input"
-            placeholder="Optional referer URL…"
-            value={refererUrl}
-            onChange={(e) => setRefererUrl(e.target.value)}
-          />
+
+        <div style={{ marginBottom: 24 }}>
+          <label className="field-label" htmlFor="refererUrl">
+            <Shield size={13} /> Referrer URL (optional)
+          </label>
+          <div className="field-input-wrap">
+            <span className="field-icon">
+              <Link2 size={15} />
+            </span>
+            <input
+              id="refererUrl"
+              className="field-input"
+              placeholder="Optional referrer URL…"
+              value={refererUrl}
+              onChange={(e) => setRefererUrl(e.target.value)}
+            />
+          </div>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
 
         <button className="btn-primary" type="submit" disabled={loading}>
+          <Link2 size={16} />
           {loading ? "Generating…" : "Generate Link"}
+          {!loading && <ArrowRight size={16} />}
         </button>
       </form>
 
       {result && (
         <div className="generated-link-box">
           <span style={{ flex: 1 }}>{result.url}</span>
-          <button className="btn-primary" style={{ width: "auto", padding: "6px 12px" }} onClick={copyLink}>
+          <button className="btn-sm btn-sm-primary" onClick={copyLink}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
             {copied ? "Copied!" : "Copy Link"}
           </button>
         </div>

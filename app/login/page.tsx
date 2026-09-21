@@ -34,7 +34,10 @@ function LoginForm() {
     <main className="stage">
       <div className="glass-card login-card">
         <Image src="/logo.png" alt="NexSpoofer" width={56} height={56} style={{ margin: "0 auto 14px" }} priority />
-        <div className="brand-mark">NexSpoofer</div>
+        <div className="brand-mark" style={{ justifyContent: "center", display: "flex" }}>
+          <span className="nex">Nex</span>
+          <span className="rest">Spoofer</span>
+        </div>
         <p className="muted">Sign in to continue.</p>
 
         {error && <div className="error-banner">{error}</div>}
