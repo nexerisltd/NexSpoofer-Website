@@ -21,4 +21,4 @@ ALLOWED_MEDIA_HOSTS = ""
 # The Next.js app's deployed origin (e.g. https://nexspoofer.vercel.app) —
 # used to set Access-Control-Allow-Origin so the browser (running on that
 # origin) is allowed to fetch this Worker's cross-origin responses.
-ALLOWED_ORIGIN = "http://localhost:3000"
+ALLOWED_ORIGIN = "https://nexspoofer.vercel.app"
