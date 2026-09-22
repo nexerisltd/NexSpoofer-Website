@@ -53,9 +53,32 @@ export async function revokeLink(linkId: string) {
   revalidatePath("/sa");
 }
 
+/**
+ * Approved-domains input accepts either a bare hostname ("b-cdn.net") or a
+ * full URL ("https://www.example.com/some/path") — normalizes either form
+ * down to just the lowercased hostname, since that's what
+ * lib/security.ts's isHostnameAllowed() actually compares against
+ * (target.hostname from the media URL). Without this, pasting a full URL
+ * (with protocol/path) got stored verbatim and could never match any real
+ * hostname, silently breaking the allowlist for that entry.
+ */
+function normalizeHostname(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  try {
+    const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+    return url.hostname.toLowerCase();
+  } catch {
+    // Fall back to the raw trimmed/lowercased value if it's not a parseable
+    // URL or hostname at all (better to store something inspectable in /sa
+    // than to silently drop it).
+    return trimmed.toLowerCase();
+  }
+}
+
 export async function addAllowedDomain(hostname: string) {
   const auth = await assertSuperAdmin();
-  const clean = hostname.trim().toLowerCase();
+  const clean = normalizeHostname(hostname);
   if (!clean) return;
   const supabase = createServiceClient();
   await supabase.from("allowed_media_domains").insert({ hostname: clean, enabled: true, created_by: auth.user.id });
