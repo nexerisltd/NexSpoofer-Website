@@ -21,6 +21,34 @@ function errorResponse(env: Env, code: string, message: string, status: number):
   });
 }
 
+/**
+ * CORS headers only stop a BROWSER from letting cross-origin JS read the
+ * response — they do nothing against a direct curl/wget/download-manager
+ * hit, which never sends a preflight and ignores CORS entirely. Since every
+ * URL this Worker serves is otherwise unauthenticated (the browser needs to
+ * load segments without a cookie round-trip each time), this Referer/Origin
+ * check is the actual guard against someone copying a Network-tab URL out
+ * of DevTools and reusing/hotlinking/leaking it elsewhere. Not bulletproof
+ * (a Referer header can be forged outside a browser), but it stops the
+ * common leak path.
+ */
+function isTrustedReferer(request: Request, env: Env): boolean {
+  if (!env.ALLOWED_ORIGIN) return true; // not configured — don't break existing deployments
+  let allowedHost: string;
+  try {
+    allowedHost = new URL(env.ALLOWED_ORIGIN).hostname.toLowerCase();
+  } catch {
+    return true;
+  }
+  const referer = request.headers.get("referer") || request.headers.get("origin");
+  if (!referer) return false;
+  try {
+    return new URL(referer).hostname.toLowerCase() === allowedHost;
+  } catch {
+    return false;
+  }
+}
+
 async function isApproved(env: Env, hostname: string): Promise<boolean> {
   const envHosts = getEnvAllowedHosts(env);
   const dbHosts = await getApprovedHostsFromDb(env);
@@ -202,6 +230,14 @@ const worker = {
     }
     if (request.method !== "GET" && request.method !== "HEAD") {
       return errorResponse(env, "METHOD_NOT_ALLOWED", "Method not allowed.", 405);
+    }
+
+    // Anti-leak guard — reject before even touching Supabase. A viewer's
+    // browser always sends Referer/Origin for a normal <video>/hls.js
+    // request made from a page on the app; a copy-pasted URL hit directly,
+    // from another site's embed, or from a bulk downloader typically won't.
+    if (!isTrustedReferer(request, env)) {
+      return errorResponse(env, "FORBIDDEN_ORIGIN", "Unable to load this media.", 403);
     }
 
     const url = new URL(request.url);

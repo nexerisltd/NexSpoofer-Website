@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { LayoutDashboard, Users, Link2, FileText, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Server, Link2, FileText, Settings, LogOut } from "lucide-react";
 import { signOutAction } from "@/app/sa/actions";
 
 export default function DashSidebar({ email }: { email: string | null }) {
@@ -24,6 +24,9 @@ export default function DashSidebar({ email }: { email: string | null }) {
         </a>
         <a href="#users" className="dash-nav-item">
           <Users size={16} /> Users
+        </a>
+        <a href="#servers" className="dash-nav-item">
+          <Server size={16} /> Servers
         </a>
         <a href="#media-links" className="dash-nav-item">
           <Link2 size={16} /> Media Links

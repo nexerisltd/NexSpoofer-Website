@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { assertSafeToFetch, isMediaHostApproved } from "@/lib/security";
 import { rewriteManifest } from "@/lib/hls";
+import { isTrustedReferer } from "@/lib/referer-check";
 
 function errorResponse(code: string, message: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  if (!isTrustedReferer(req)) {
+    return errorResponse("FORBIDDEN_ORIGIN", "Unable to load this media.", 403);
+  }
+
   const { id } = await params;
   const supabase = createServiceClient();
   const { data: link } = await supabase.from("media_links").select("*").eq("public_id", id).maybeSingle();

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getServerById } from "@/lib/servers";
 import Player from "@/components/player/Player";
 import ImageViewer from "@/components/player/ImageViewer";
 
@@ -34,7 +35,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const supabase = createServiceClient();
   const { data: link } = await supabase
     .from("media_links")
-    .select("public_id, media_type, status, expires_at")
+    .select("public_id, media_type, status, expires_at, server_id")
     .eq("public_id", id)
     .maybeSingle();
 
@@ -45,11 +46,24 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     return <ErrorState message="This media link has expired." />;
   }
 
-  const mediaBase = process.env.NEXT_PUBLIC_MEDIA_PROXY_URL;
+  // Multi-server routing: a link created against a specific server
+  // (provider) plays back through that same server's Worker. Links created
+  // before multi-server support has no server_id and fall back to the
+  // single NEXT_PUBLIC_MEDIA_PROXY_URL env var, same as before.
+  let mediaBase: string | null = null;
+  if (link.server_id) {
+    const server = await getServerById(link.server_id);
+    if (!server || !server.enabled) {
+      return <ErrorState message="This link's server is currently unavailable." />;
+    }
+    mediaBase = server.worker_url;
+  } else {
+    mediaBase = process.env.NEXT_PUBLIC_MEDIA_PROXY_URL || null;
+  }
+
   if (!mediaBase) {
-    // Fails loudly rather than silently pointing at a broken URL — this
-    // means NEXT_PUBLIC_MEDIA_PROXY_URL wasn't set in the deployment.
-    return <ErrorState message="Media proxy is not configured. Set NEXT_PUBLIC_MEDIA_PROXY_URL." />;
+    // Fails loudly rather than silently pointing at a broken URL.
+    return <ErrorState message="Media proxy is not configured. Add a server in /sa or set NEXT_PUBLIC_MEDIA_PROXY_URL." />;
   }
 
   if (link.media_type === "hls") {

@@ -161,6 +161,7 @@ body::after {
 
 .generated-link-box {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   background: rgba(59, 130, 246, 0.1);
@@ -171,6 +172,7 @@ body::after {
   font-size: 12.5px;
   word-break: break-all;
 }
+.generated-link-box > span { min-width: 180px; }
 
 .unauthorized-note { color: var(--muted); font-size: 13px; text-align: center; margin-top: 60px; }
 
@@ -369,3 +371,6 @@ body::after {
   transform: translateY(-65%) rotate(45deg);
   pointer-events: none;
 }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.8s linear infinite; }

@@ -4,9 +4,12 @@ import { requireRole, getSessionProfile } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/service";
 import DashSidebar from "@/components/sa/DashSidebar";
 import UsersPanel from "@/components/sa/UsersPanel";
+import ServersPanel from "@/components/sa/ServersPanel";
+import ServerAccessPanel from "@/components/sa/ServerAccessPanel";
 import CopyButton from "@/components/sa/CopyButton";
 import LiveStatusWidget from "@/components/ui/LiveStatusWidget";
 import { revokeLink, addAllowedDomain, removeAllowedDomain } from "./actions";
+import type { MediaServer } from "@/lib/servers";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -18,6 +21,12 @@ const ACTION_PILL: Record<string, string> = {
   ADMIN_PERMISSION_CHANGED: "pill-violet",
   DOMAIN_ADDED: "pill-green",
   DOMAIN_REMOVED: "pill-red",
+  SERVER_ADDED: "pill-green",
+  SERVER_REMOVED: "pill-red",
+  SERVER_ENABLED: "pill-green",
+  SERVER_DISABLED: "pill-amber",
+  SERVER_ACCESS_GRANTED: "pill-blue",
+  SERVER_ACCESS_REVOKED: "pill-red",
 };
 
 export default async function SuperAdminPage() {
@@ -29,12 +38,22 @@ export default async function SuperAdminPage() {
   const { user } = await getSessionProfile();
 
   const supabase = createServiceClient();
-  const [{ data: profiles }, { data: links }, { data: domains }, { data: logs }] = await Promise.all([
-    supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
-    supabase.from("media_links").select("*").order("created_at", { ascending: false }).limit(50),
-    supabase.from("allowed_media_domains").select("*").order("created_at", { ascending: false }),
-    supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(30),
-  ]);
+  const [{ data: profiles }, { data: links }, { data: domains }, { data: logs }, { data: servers }, { data: accessRows }] =
+    await Promise.all([
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }).limit(100),
+      supabase.from("media_links").select("*").order("created_at", { ascending: false }).limit(50),
+      supabase.from("allowed_media_domains").select("*").order("created_at", { ascending: false }),
+      supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(30),
+      supabase.from("media_servers").select("id, name, worker_url, enabled").order("created_at", { ascending: true }),
+      supabase.from("admin_server_access").select("admin_id, server_id"),
+    ]);
+
+  const serverList = (servers as MediaServer[]) || [];
+  const serverNameById = new Map(serverList.map((s) => [s.id, s.name]));
+  const accessSet = new Set((accessRows || []).map((r: { admin_id: string; server_id: string }) => `${r.admin_id}:${r.server_id}`));
+  const adminRows = (profiles || [])
+    .filter((p) => p.role === "admin" || p.role === "super_admin")
+    .map((p) => ({ id: p.id, email: p.email, role: p.role as "admin" | "super_admin" }));
 
   async function revoke(formData: FormData) {
     "use server";
@@ -63,7 +82,7 @@ export default async function SuperAdminPage() {
               </span>
             </h1>
             <p className="subtitle">
-              <strong style={{ color: "var(--foreground)" }}>Super Admin Panel</strong> — Manage users, media links
+              <strong style={{ color: "var(--foreground)" }}>Super Admin Panel</strong> — Manage users, servers, media links
               and system logs.
             </p>
           </div>
@@ -71,6 +90,10 @@ export default async function SuperAdminPage() {
         </div>
 
         <UsersPanel profiles={profiles || []} />
+
+        <ServersPanel servers={serverList} />
+
+        <ServerAccessPanel admins={adminRows} servers={serverList} access={accessSet} />
 
         <section className="dash-panel glass-card" id="media-links">
           <div className="dash-panel-head">
@@ -87,6 +110,7 @@ export default async function SuperAdminPage() {
               <tr>
                 <th>Public ID</th>
                 <th>Type</th>
+                <th>Server</th>
                 <th>Status</th>
                 <th>Hits</th>
                 <th>Expires</th>
@@ -102,6 +126,9 @@ export default async function SuperAdminPage() {
                   </td>
                   <td>
                     <span className={`pill ${l.media_type === "hls" ? "pill-violet" : "pill-blue"}`}>{l.media_type}</span>
+                  </td>
+                  <td style={{ color: "var(--muted)", fontSize: 12 }}>
+                    {l.server_id ? serverNameById.get(l.server_id) || "(deleted server)" : "default (env)"}
                   </td>
                   <td>
                     <span className="status-cell">

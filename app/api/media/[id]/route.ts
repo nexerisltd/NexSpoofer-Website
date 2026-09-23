@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { assertSafeToFetch, isMediaHostApproved } from "@/lib/security";
+import { isTrustedReferer } from "@/lib/referer-check";
 
 function errorResponse(code: string, message: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Cheapest possible check first — reject before touching the DB at all.
+  if (!isTrustedReferer(req)) {
+    return errorResponse("FORBIDDEN_ORIGIN", "Unable to load this media.", 403);
+  }
+
   const { id } = await params;
   const supabase = createServiceClient();
   const { data: link } = await supabase.from("media_links").select("*").eq("public_id", id).maybeSingle();

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { getSessionProfile } from "@/lib/auth";
+import { getServersForUser } from "@/lib/servers";
 import LinkGenForm from "@/components/linkgen/LinkGenForm";
 import LiveStatusWidget from "@/components/ui/LiveStatusWidget";
 
@@ -16,6 +17,8 @@ export default async function LinkGenPage() {
   if (profile.role !== "admin" && profile.role !== "super_admin") {
     return <p className="unauthorized-note">You are not authorized to access this page.</p>;
   }
+
+  const servers = await getServersForUser(user.id, profile.role);
 
   return (
     <main style={{ minHeight: "100dvh", padding: "28px 32px" }}>
@@ -36,7 +39,7 @@ export default async function LinkGenPage() {
       </div>
 
       <div style={{ display: "flex", justifyContent: "center" }}>
-        <LinkGenForm />
+        <LinkGenForm servers={servers} />
       </div>
     </main>
   );

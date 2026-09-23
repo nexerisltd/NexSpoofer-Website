@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { assertSafeToFetch, isMediaHostApproved, isSameOrigin } from "@/lib/security";
 import { decryptUrl } from "@/lib/crypto";
 import { rewriteManifest } from "@/lib/hls";
+import { isTrustedReferer } from "@/lib/referer-check";
 
 function errorResponse(code: string, message: string, status: number) {
   return NextResponse.json({ success: false, error: { code, message } }, { status });
@@ -12,6 +13,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string; token: string }> }
 ) {
+  if (!isTrustedReferer(req)) {
+    return errorResponse("FORBIDDEN_ORIGIN", "Unable to load this media.", 403);
+  }
+
   const { id, token } = await params;
   const supabase = createServiceClient();
   const { data: link } = await supabase.from("media_links").select("*").eq("public_id", id).maybeSingle();
@@ -41,11 +46,6 @@ export async function GET(
     /* fall back to target's own hostname */
   }
 
-  // The manifest route already required the origin hostname to be
-  // approved before this segment could ever have been generated, so a
-  // same-site sub-resource (common CDN pattern — segments on a slightly
-  // different subdomain than the manifest) is trusted too, not just an
-  // exact allowlist match.
   const approved = await isMediaHostApproved(target.hostname);
   const sameSite = isSameOrigin(target.hostname, originHostname);
   if (!approved && !sameSite) {

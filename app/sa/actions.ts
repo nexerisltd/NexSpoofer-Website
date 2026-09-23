@@ -69,9 +69,6 @@ function normalizeHostname(raw: string): string {
     const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
     return url.hostname.toLowerCase();
   } catch {
-    // Fall back to the raw trimmed/lowercased value if it's not a parseable
-    // URL or hostname at all (better to store something inspectable in /sa
-    // than to silently drop it).
     return trimmed.toLowerCase();
   }
 }
@@ -92,4 +89,108 @@ export async function removeAllowedDomain(id: string, hostname: string) {
   await supabase.from("allowed_media_domains").delete().eq("id", id);
   await logAction(auth.user.id, "DOMAIN_REMOVED", "allowed_media_domain", hostname);
   revalidatePath("/sa");
+}
+
+// ---------------------------------------------------------------------
+// Media servers (multi-provider Worker deployments)
+// ---------------------------------------------------------------------
+
+function normalizeWorkerUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  const withProto = trimmed.includes("://") ? trimmed : `https://${trimmed}`;
+  try {
+    const url = new URL(withProto);
+    // Strip any trailing slash/path — the app always appends /media/... itself.
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return "";
+  }
+}
+
+export async function addServer(name: string, workerUrl: string) {
+  const auth = await assertSuperAdmin();
+  const cleanName = name.trim();
+  const cleanUrl = normalizeWorkerUrl(workerUrl);
+  if (!cleanName || !cleanUrl) return;
+  const supabase = createServiceClient();
+  await supabase.from("media_servers").insert({ name: cleanName, worker_url: cleanUrl, enabled: true, created_by: auth.user.id });
+  await logAction(auth.user.id, "SERVER_ADDED", "media_server", cleanName, { worker_url: cleanUrl });
+  revalidatePath("/sa");
+}
+
+export async function setServerEnabled(serverId: string, enabled: boolean) {
+  const auth = await assertSuperAdmin();
+  const supabase = createServiceClient();
+  await supabase.from("media_servers").update({ enabled }).eq("id", serverId);
+  await logAction(auth.user.id, enabled ? "SERVER_ENABLED" : "SERVER_DISABLED", "media_server", serverId);
+  revalidatePath("/sa");
+}
+
+export async function removeServer(serverId: string, name: string) {
+  const auth = await assertSuperAdmin();
+  const supabase = createServiceClient();
+  // Links already pointing at this server fall back to
+  // NEXT_PUBLIC_MEDIA_PROXY_URL automatically (server_id -> null via FK).
+  await supabase.from("media_servers").delete().eq("id", serverId);
+  await logAction(auth.user.id, "SERVER_REMOVED", "media_server", name);
+  revalidatePath("/sa");
+}
+
+/** Toggle one admin's access to one server on/off — called from a checkbox
+ * grid in /sa, so it takes the desired end state directly rather than
+ * flipping current state (avoids a race if two clicks land close together). */
+export async function setAdminServerAccess(adminId: string, serverId: string, hasAccess: boolean) {
+  const auth = await assertSuperAdmin();
+  const supabase = createServiceClient();
+  if (hasAccess) {
+    await supabase
+      .from("admin_server_access")
+      .upsert({ admin_id: adminId, server_id: serverId, granted_by: auth.user.id }, { onConflict: "admin_id,server_id" });
+    await logAction(auth.user.id, "SERVER_ACCESS_GRANTED", "admin_server_access", `${adminId}:${serverId}`);
+  } else {
+    await supabase.from("admin_server_access").delete().eq("admin_id", adminId).eq("server_id", serverId);
+    await logAction(auth.user.id, "SERVER_ACCESS_REVOKED", "admin_server_access", `${adminId}:${serverId}`);
+  }
+  revalidatePath("/sa");
+}
+
+export type ServerHealth = { ok: boolean; detail: string; ms: number };
+
+/**
+ * Pings a Worker with a bogus link id and checks whether OUR OWN JSON error
+ * shape comes back ({"success":false,"error":{"code":"LINK_NOT_FOUND",...}}).
+ * That distinguishes "the Worker is alive and our code is still running"
+ * from "the account/Worker was suspended or deleted" (which surfaces as a
+ * connection failure, a Cloudflare edge error page, or a non-JSON body) —
+ * without needing any real media link or touching the database at all.
+ */
+export async function checkServerHealth(serverId: string): Promise<ServerHealth> {
+  await assertSuperAdmin();
+  const supabase = createServiceClient();
+  const { data: server } = await supabase.from("media_servers").select("worker_url").eq("id", serverId).maybeSingle();
+  if (!server) return { ok: false, detail: "Server not found.", ms: 0 };
+
+  const started = Date.now();
+  try {
+    const res = await fetch(`${server.worker_url}/media/__healthcheck__`, {
+      signal: AbortSignal.timeout(8000),
+      cache: "no-store",
+    });
+    const ms = Date.now() - started;
+    const body = await res.json().catch(() => null);
+    if (body && body.success === false && body.error?.code === "LINK_NOT_FOUND") {
+      return { ok: true, detail: `Responding normally (${res.status}).`, ms };
+    }
+    if (body && body.error?.code === "FORBIDDEN_ORIGIN") {
+      // Worker is alive but the health check itself has no Referer — still
+      // proves the account/Worker exists and is executing code.
+      return { ok: true, detail: "Responding normally (referer-guard active).", ms };
+    }
+    return { ok: false, detail: `Unexpected response (HTTP ${res.status}) — Worker may be suspended or misconfigured.`, ms };
+  } catch (e) {
+    const ms = Date.now() - started;
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    return { ok: false, detail: `Unreachable: ${msg}`, ms };
+  }
 }
