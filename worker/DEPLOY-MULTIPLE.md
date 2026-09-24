@@ -56,3 +56,32 @@ would actually draw manual attention from a platform's Trust & Safety team
 if someone reported it — not the cross-domain video embedding itself, which
 is completely ordinary. Making the repo private removes that exposure with
 zero code changes.
+
+## Doing all of this faster: deploy-server.sh / deploy-all.sh
+
+Repeating the deploy + 3 secrets by hand for every provider gets tedious
+fast, so two small scripts are included here:
+
+```bash
+cd worker
+chmod +x deploy-server.sh deploy-all.sh   # first time only
+
+# One server at a time:
+./deploy-server.sh nexspoofer-media-providera <PROVIDER_A_ACCOUNT_ID>
+
+# Or all of them in one go — copy servers.example.txt to servers.txt,
+# fill in real account IDs (from `npx wrangler whoami` once you've
+# accepted every invite), then:
+export SUPABASE_URL="https://xxxxx.supabase.co"
+export SUPABASE_SERVICE_ROLE_KEY="eyJ..."
+./deploy-all.sh
+```
+
+`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are identical for every
+server (same Supabase project), so exporting them once means you're not
+retyping them 4 times — only `ENCRYPTION_KEY` is generated fresh per
+server automatically, on purpose (see the security note above).
+
+`servers.txt` holds real Cloudflare account IDs — it's already in
+`.gitignore` so it won't get committed if this repo is public.
+

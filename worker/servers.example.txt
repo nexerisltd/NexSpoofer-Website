@@ -1,0 +1,9 @@
+# One line per server: <worker-name>=<cloudflare-account-id>
+# Get account IDs from `npx wrangler whoami` after you've accepted every
+# provider's Member invite. Copy this file to servers.txt (gitignored) and
+# fill in real values — don't commit real account IDs if this repo is
+# public.
+nexspoofer-media-providera= 
+nexspoofer-media-providerb=REPLACE_WITH_PROVIDER_B_ACCOUNT_ID
+nexspoofer-media-providerc=REPLACE_WITH_PROVIDER_C_ACCOUNT_ID
+nexspoofer-media-spare=REPLACE_WITH_YOUR_OWN_SECOND_ACCOUNT_ID
