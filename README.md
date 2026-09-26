@@ -7,6 +7,11 @@ Authenticated web app for generating opaque, referer-spoofed media player
 links for authorized content. Next.js (App Router) + Supabase (Auth + DB)
 + a custom Liquid Glass HLS/video/image player.
 
+> **See `CHANGES.md` in this same folder** for everything added after this
+> README was originally written — multi-server/multi-provider support,
+> the Referer/Origin leak-blocking guard, and the deploy automation
+> scripts. This file is kept as the original project description.
+
 **Two separate deployments**, on purpose:
 - **Next.js app** (this repo's root) — auth, `/LinkGen`, `/sa`, the player
   *UI* shell. Deployed to Vercel. Low bandwidth (HTML/JSON only).
@@ -31,6 +36,8 @@ amount of code can skip them. Budget ~25–30 minutes total.
 2. Project Settings → API → copy **Project URL**, **anon public key**,
    and **service_role key** (keep the service key secret).
 3. SQL Editor → paste the entire contents of `supabase/schema.sql` → Run.
+4. Also run `supabase/migrations/002_multi_server.sql` (adds multi-server
+   support — see `CHANGES.md`).
 
 ### 2. Google OAuth, wired through Supabase (~10 min)
 1. Supabase Dashboard → Authentication → Providers → **Google** → enable
@@ -49,7 +56,8 @@ amount of code can skip them. Budget ~25–30 minutes total.
 See `worker/README.md` for the full walkthrough (login, set 3 secrets,
 edit one config value, deploy). You'll get a URL like
 `https://nexspoofer-media.yoursubdomain.workers.dev` — you need this for
-step 4 below.
+step 4 below. For more than one server/provider, see
+`worker/DEPLOY-MULTIPLE.md`.
 
 ### 4. Deploy the Next.js app to Vercel (~5 min)
 1. Push this project to a GitHub repo, then import it in Vercel.
@@ -64,7 +72,8 @@ step 4 below.
 
 Once all four are done, sign in once with the Google account you want as
 the first Super Admin, having already set `BOOTSTRAP_SUPER_ADMIN_EMAIL`
-to that same address before that first login.
+to that same address before that first login. Then go to `/sa` → **Media
+Servers** and add your Worker URL as your first server (see `CHANGES.md`).
 
 ---
 
@@ -89,7 +98,9 @@ commit a real `.env` file.
   free tier. It reads/writes the *same* Supabase tables as the Next.js
   app (via the REST API, no shared code) — `media_links` for link
   resolution and hit counts, `allowed_media_domains` for the live
-  allowlist.
+  allowlist. Since the multi-server update, you can run several of these
+  (one per provider/account) — see `CHANGES.md` and
+  `worker/DEPLOY-MULTIPLE.md`.
 - **Opaque link resolution**: `/p/[publicId]` (Next.js) → DB lookup →
   player UI, which then points at the Worker's URLs for actual playback.
   Sub-resource URLs inside a rewritten manifest are not looked up in any
@@ -126,7 +137,9 @@ commit a real `.env` file.
 
 See `supabase/schema.sql` for the authoritative version (tables:
 `profiles`, `media_links`, `allowed_media_domains`, `audit_logs`, plus a
-trigger that auto-creates a `profiles` row on first Google sign-in).
+trigger that auto-creates a `profiles` row on first Google sign-in), and
+`supabase/migrations/002_multi_server.sql` for the multi-server addition
+(`media_servers`, `admin_server_access`, `media_links.server_id`).
 
 **Simplified from the original spec's fully granular
 `permissions`/`role_permissions`/`user_roles` tables** to a single
@@ -144,17 +157,19 @@ granularity is in place.
 | Action | user | admin | super_admin |
 |---|---|---|---|
 | Sign in, watch a link | ✅ | ✅ | ✅ |
-| Create a link (`/LinkGen`) | ❌ | ✅ | ✅ |
+| Create a link (`/LinkGen`) | ❌ | ✅ (only on servers they're granted) | ✅ (all servers) |
 | Access `/sa` | ❌ | ❌ | ✅ |
 | Change any user's role/status | ❌ | ❌ | ✅ |
 | Revoke any link | ❌ | ❌ | ✅ |
 | Manage approved domains | ❌ | ❌ | ✅ |
+| Manage media servers / server access | ❌ | ❌ | ✅ |
 
 **Not implemented as spec'd**: an admin cannot currently have a *subset*
-of admin capabilities (spec's granular `linkgen.create` vs `users.manage`
-etc.) — every admin currently gets the same single `admin` capability
-(create links). Section 17's "admins cannot manage other admins" rule
-holds trivially today since admins have no user-management access at all.
+of admin capabilities beyond server access (spec's granular
+`linkgen.create` vs `users.manage` etc.) — every admin currently gets the
+same single `admin` capability (create links, scoped to their granted
+servers). Section 17's "admins cannot manage other admins" rule holds
+trivially today since admins have no user-management access at all.
 
 ## Security model
 
@@ -194,6 +209,10 @@ holds trivially today since admins have no user-management access at all.
 - **Sub-resource URLs**: AES-256-GCM encrypted into the rewritten manifest
   paths, entirely inside the Worker (Web Crypto, not Node's `crypto` —
   see Architecture above) — never plain, never DB-round-tripped.
+- **Referer/Origin leak guard** (see `CHANGES.md`): the Worker and every
+  Next.js media route reject requests whose Referer/Origin doesn't match
+  the app's own domain — CORS headers alone don't stop a direct
+  curl/download-manager hit, only a browser honors them.
 - **`/sa` is hidden, not just role-checked**: unauthorized access returns
   a genuine Next.js 404, not a 403 or a redirect to login — the route's
   existence isn't revealed.
@@ -205,8 +224,8 @@ holds trivially today since admins have no user-management access at all.
   primary gate.
 - **One intentional hardcoded identity**: `BOOTSTRAP_SUPER_ADMIN_EMAIL` in
   `lib/auth.ts`, solely to promote the very first super admin on first
-  login. Every other authorization check reads `profiles.role` from the
-  DB.
+  login. Every other authorization check reads `profiles.role` (and, for
+  server access, `admin_server_access`) from the DB.
 - **CORS**: the Worker is a different origin from the Next.js app by
   design, so it sets `Access-Control-Allow-Origin` to exactly
   `ALLOWED_ORIGIN` (the Next.js app's URL) rather than `*` — only that
@@ -217,16 +236,19 @@ holds trivially today since admins have no user-management access at all.
 - Google sign-in via Supabase Auth, session refresh middleware, and a
   working post-login redirect back to the original `?next=` target
   (e.g. a shared `/p/[id]` link, not just always `/LinkGen`)
-- `/LinkGen` (admin+): paste media URL + optional referer → opaque link
+- `/LinkGen` (admin+): paste media URL + optional referer + pick a server
+  (only ones you've been granted) → opaque link
 - Auto HLS vs direct detection from the URL; for "direct" links the
   client sniffs the actual Content-Type (via a HEAD request to the
   Worker) to decide video-player vs image-viewer at runtime, since the
   real file extension is never exposed to the browser
 - **Cloudflare Worker media proxy** (`worker/`), fully separate from
-  Vercel bandwidth: HLS manifest fetch + full URI rewrite (master + media
-  playlists, `#EXT-X-KEY`/`#EXT-X-MAP`), referer spoof, Range-aware direct
-  proxy, CORS scoped to the Next.js app's origin, segment responses
-  cache-headers set for CDN/browser reuse on retry
+  Vercel bandwidth, and now deployable as multiple independent servers
+  (one per provider/account — see `CHANGES.md`): HLS manifest fetch +
+  full URI rewrite (master + media playlists, `#EXT-X-KEY`/`#EXT-X-MAP`),
+  referer spoof, Range-aware direct proxy, CORS + Referer/Origin guard
+  scoped to the Next.js app's origin, segment responses cache-headers set
+  for CDN/browser reuse on retry
 - Custom Liquid Glass player: seek bar (buffered+played+drag), ±10s,
   volume w/ hover slider, settings popover (speed+quality backed by real
   `hls.js` levels), fullscreen, keyboard shortcuts (Space/K, arrows, M, F),
@@ -243,22 +265,25 @@ holds trivially today since admins have no user-management access at all.
   native `<video>` element errors (for direct mp4 links) are now caught
   too, not just hls.js errors
 - Image viewer: blurred backdrop, click-to-zoom, loading/error states
-- `/sa` hidden dashboard: user list w/ role+suspend controls, link list
-  w/ revoke, approved-domains manager, audit log viewer — all via Next.js
-  Server Actions, all re-checking `super_admin` server-side independent
-  of the page gate
+- `/sa` hidden dashboard: user list w/ role+suspend controls, media
+  servers manager + per-admin server access grid + health check, link
+  list w/ revoke, approved-domains manager, audit log viewer — all via
+  Next.js Server Actions, all re-checking `super_admin` server-side
+  independent of the page gate
 - SSRF protection on both deployments (Node DNS-resolve check on Vercel,
   Cloudflare's platform-level private-IP block + a fail-fast string check
   on the Worker)
 - Audit logging for role changes, suspensions, link creation/revocation,
-  domain add/remove
+  domain add/remove, server add/remove/enable/disable, server-access
+  grant/revoke
 - `noindex` on player/admin pages
 - App icon/favicon and in-app logo (`public/logo.png`, `app/icon.png`)
 
 ## Features NOT implemented (be honest about this)
 
-- Granular per-permission admin capabilities (spec §16) — collapsed to a
-  single `admin` role for MVP speed (see Permission Matrix above)
+- Granular per-permission admin capabilities beyond server access
+  (spec §16) — collapsed to a single `admin` role for MVP speed (see
+  Permission Matrix above)
 - Rate limiting — not added on **either** deployment; needed before any
   public exposure beyond a trusted small team, especially on link
   creation (Next.js) and media proxying request volume (Worker)
@@ -272,6 +297,8 @@ holds trivially today since admins have no user-management access at all.
   set (no Cache API / KV-backed manifest caching)
 - Automated tests — none written on either deployment; manual
   verification + `tsc`/build/dry-run only (see below)
+- Scheduled/automatic server health checks — the `/sa` health check is
+  manual (click a button), not run on a timer
 
 ## What was actually verified vs. just written
 
@@ -298,10 +325,9 @@ Actually run and passing in this environment:
   tuning — the config values are standard hls.js recommendations for
   reducing rebuffer frequency, not something benchmarked against your
   specific CDN and connection from here
-
-Please run through the checklist in spec §38 yourself once everything is
-wired up — this is exactly the kind of thing that looks right in code and
-needs a real click-through to confirm.
+- The multi-server / leak-blocking / deploy-script code added after this
+  README was written — see `CHANGES.md` for the same honesty about what's
+  and isn't confirmed working there.
 
 ## Deployment instructions
 
@@ -320,3 +346,5 @@ needs a real click-through to confirm.
    link creation will return "not on the approved list" until you do
    this, and the Worker will independently reject the fetch too even if
    that check were somehow skipped.
+5. Also add your Worker as a server in `/sa` → "Media Servers" (see
+   `CHANGES.md`) before using `/LinkGen`.

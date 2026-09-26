@@ -78,6 +78,13 @@ Wrangler will prompt for local versions of the secrets, or you can create
 a `.dev.vars` file (gitignored) with `KEY=value` lines for local-only
 testing.
 
+## Multiple servers / multiple Cloudflare accounts
+
+See `DEPLOY-MULTIPLE.md` in this folder — covers deploying this same
+Worker code under a provider's own Cloudflare account (so each provider's
+free-tier quota is separate), and the `deploy-server.mjs` / `deploy-all.mjs`
+scripts that automate it.
+
 ## What this does NOT include (yet)
 
 - No caching/edge-side optimization beyond the `Cache-Control` headers

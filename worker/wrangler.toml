@@ -6,6 +6,12 @@
 #   npx wrangler secret put SUPABASE_URL
 #   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 #   npx wrangler secret put ENCRYPTION_KEY
+#
+# Deliberately NOT setting `account_id` here — leaving it out lets this
+# same file deploy to any Cloudflare account via the CLOUDFLARE_ACCOUNT_ID
+# environment variable, which is what deploy-server.mjs / deploy-all.mjs
+# use to target a different provider's account per deployment. See
+# DEPLOY-MULTIPLE.md.
 
 name = "nexspoofer-media"
 main = "src/index.ts"
@@ -18,7 +24,8 @@ compatibility_date = "2025-01-01"
 # Supabase table.
 ALLOWED_MEDIA_HOSTS = ""
 
-# The Next.js app's deployed origin (e.g. https://nexspoofer.vercel.app) —
-# used to set Access-Control-Allow-Origin so the browser (running on that
-# origin) is allowed to fetch this Worker's cross-origin responses.
+# The Next.js app's deployed origin — used to set
+# Access-Control-Allow-Origin (browser CORS) AND as the Referer/Origin
+# anti-leak guard added in worker/src/index.ts. Update this if your app's
+# domain ever changes, and redeploy every server that uses this file.
 ALLOWED_ORIGIN = "https://nexspoofer.vercel.app"
